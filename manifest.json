@@ -2,9 +2,9 @@
   "$schema": "./schema/piphi-manifest.schema.json",
   "manifest_version": "1.0",
   "id": "piphi-network-mikrotik-router",
-  "name": "Piphi Network Mikrotik Router",
+  "name": "MikroTik RouterOS",
   "version": "0.1.0",
-  "description": "PiPhi monitoring-first starter runtime for MikroTik RouterOS devices.",
+  "description": "Monitor RouterOS health, interfaces, clients, and explicitly enabled controls.",
   "metadata": {
     "generator": "piphi-network-create",
     "scaffold_version": "0.3.0",
@@ -132,5 +132,71 @@
         "default_widget": "tile"
       }
     }
-  ]
+  ],
+  "marketplace": {
+    "metadata_version": 2,
+    "display_name": "MikroTik RouterOS",
+    "summary": "Monitor RouterOS health, interfaces, clients, and explicitly enabled controls.",
+    "category": "networking",
+    "regions": [
+      "WW"
+    ],
+    "languages": [
+      "en"
+    ],
+    "publisher": {
+      "name": "PiPhi Network",
+      "website_url": "https://piphi.io",
+      "support_url": "https://github.com/PiPhi-io/piphi-network-mikrotik-router/issues",
+      "security_contact": "support@piphi.io"
+    },
+    "access": [
+      {
+        "id": "local_network",
+        "label": "Local network access",
+        "reason": "Discovers or communicates with supported services and devices on the homeowner's local network.",
+        "required": true
+      },
+      {
+        "id": "credentials",
+        "label": "Account or device credentials",
+        "reason": "Authenticates only to the configured vendor account, service, or local device and keeps credentials out of state and diagnostics.",
+        "required": true
+      }
+    ],
+    "compatibility": [
+      {
+        "brand": "MikroTik",
+        "model": "Supported RouterOS devices and API versions"
+      }
+    ],
+    "documentation_url": "https://github.com/PiPhi-io/piphi-network-mikrotik-router",
+    "support_url": "https://github.com/PiPhi-io/piphi-network-mikrotik-router/issues",
+    "changelog_url": "https://github.com/PiPhi-io/piphi-network-mikrotik-router/releases",
+    "quality_tier": "unrated",
+    "governance": {
+      "schema_version": 1,
+      "publication_status": "draft",
+      "rollout_percent": 0,
+      "lifecycle_status": "active",
+      "qualification": {
+        "status": "unverified"
+      }
+    },
+    "device_types": [
+      "router",
+      "network switch",
+      "wireless access point"
+    ],
+    "protocols": [
+      "RouterOS API",
+      "HTTPS"
+    ],
+    "discovery_methods": [
+      "manual",
+      "local network discovery"
+    ],
+    "connectivity": "local",
+    "offline_support": "full"
+  }
 }
