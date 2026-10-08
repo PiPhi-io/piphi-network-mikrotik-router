@@ -23,6 +23,8 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
         "kind": "sensor",
         "unit": "bool"
     },
+    "cpu_load_percent": {"kind": "sensor", "value_kind": "numeric", "unit": "%"},
+    "memory_used_percent": {"kind": "sensor", "value_kind": "numeric", "unit": "%"},
     "refresh": {
         "kind": "action"
     }
@@ -31,7 +33,7 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
 COMMANDS: dict[str, dict[str, Any]] = {
     "refresh": {
         "description": "Refresh the device state.",
-        "timeout_ms": 5000
+        "timeout_ms": 12000
     }
 }
 
@@ -51,6 +53,9 @@ CONFIG_SCHEMA: dict[str, Any] = {
                 "type": "string",
                 "title": "Alias"
             },
+            "username": {"type": "string", "title": "Read-only RouterOS username"},
+            "api_key": {"type": "string", "title": "RouterOS password"},
+            "ca_bundle_path": {"type": "string", "title": "CA bundle path (optional)"},
             "poll_interval_seconds": {
                 "type": "integer",
                 "title": "Poll Interval Seconds",
@@ -65,6 +70,9 @@ CONFIG_SCHEMA: dict[str, Any] = {
         "alias": {
             "placeholder": "Office Device"
         },
+        "username": {"placeholder": "monitor"},
+        "api_key": {"ui:widget": "password"},
+        "ca_bundle_path": {"placeholder": "/etc/ssl/certs/router-ca.pem"},
         "poll_interval_seconds": {
             "placeholder": "30"
         }
@@ -78,6 +86,8 @@ FALLBACK_ENTITY: dict[str, Any] = {
     "entity_type": "router",
     "capabilities": [
         "connected",
+        "cpu_load_percent",
+        "memory_used_percent",
         "refresh"
     ],
     "available_commands": [

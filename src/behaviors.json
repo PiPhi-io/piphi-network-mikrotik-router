@@ -125,6 +125,8 @@
       "entityType": "router",
       "capabilities": [
         "connected",
+        "cpu_load_percent",
+        "memory_used_percent",
         "refresh"
       ],
       "targeting": {

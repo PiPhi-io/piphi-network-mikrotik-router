@@ -74,6 +74,9 @@
     "editable_fields": [
       "host",
       "alias",
+      "username",
+      "api_key",
+      "ca_bundle_path",
       "poll_interval_seconds"
     ],
     "runtime_fields": [
@@ -96,6 +99,8 @@
       "kind": "sensor",
       "unit": "bool"
     },
+    "cpu_load_percent": {"kind": "sensor", "value_kind": "numeric", "unit": "%"},
+    "memory_used_percent": {"kind": "sensor", "value_kind": "numeric", "unit": "%"},
     "refresh": {
       "kind": "action"
     }
@@ -103,7 +108,7 @@
   "commands": {
     "refresh": {
       "description": "Refresh the device state.",
-      "timeout_ms": 5000
+      "timeout_ms": 12000
     }
   },
   "entities": [
@@ -114,6 +119,8 @@
       "entity_type": "router",
       "capabilities": [
         "connected",
+        "cpu_load_percent",
+        "memory_used_percent",
         "refresh"
       ],
       "available_commands": [
@@ -133,6 +140,11 @@
       }
     }
   ],
+  "ui": {
+    "experience_packages": [
+      {"registry_id": "io.piphi.mikrotik-health", "version_range": ">=0.1,<1", "auto_install": true}
+    ]
+  },
   "marketplace": {
     "metadata_version": 2,
     "display_name": "MikroTik RouterOS",
@@ -150,6 +162,7 @@
       "support_url": "https://github.com/PiPhi-io/piphi-network-mikrotik-router/issues",
       "security_contact": "support@piphi.io"
     },
+    "access_declared": true,
     "access": [
       {
         "id": "local_network",
