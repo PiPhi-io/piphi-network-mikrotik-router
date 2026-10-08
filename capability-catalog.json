@@ -13,14 +13,20 @@
     {
       "id": "runtime-foundation", "status": "implemented", "scope": ["all-configurations"],
       "source_refs": ["core_vocabulary"],
-      "reason": "The scaffold implements configuration presence, connectivity state, refresh dispatch, and its configuration event.",
+      "reason": "The runtime reports connectivity from an authenticated RouterOS response, supports refresh, and emits a configuration event.",
       "state": ["connected"], "events": ["runtime.config.applied"], "conditions": ["state_matches"], "actions": ["refresh"]
+    },
+    {
+      "id": "routeros-resource-overview", "status": "implemented", "scope": ["routers-with-https-rest-and-read-only-credentials"],
+      "source_refs": ["routeros_rest"],
+      "reason": "Authenticated read-only /system/resource provides CPU load and free/total memory for a bounded health overview.",
+      "state": ["cpu_load_percent", "memory_used_percent"], "events": [], "conditions": [], "actions": []
     },
     {
       "id": "transport-identity-and-resource-health", "status": "planned", "scope": ["routeros-api-or-rest-enabled-routers"],
       "source_refs": ["routeros_rest", "routeros_api"],
       "reason": "TLS, least-privilege login, version parsing, package discovery, timeouts, and reconnect behavior need implementation and fixtures.",
-      "state": ["board_name", "platform", "architecture", "routeros_version", "firmware_version", "serial_suffix", "uptime_seconds", "cpu_load_percent", "cpu_count", "memory_used_bytes", "memory_free_bytes", "storage_used_bytes", "storage_free_bytes", "temperature_c", "voltage_v", "api_latency_ms", "last_seen_at"],
+      "state": ["board_name", "platform", "architecture", "routeros_version", "firmware_version", "serial_suffix", "uptime_seconds", "cpu_count", "memory_used_bytes", "memory_free_bytes", "storage_used_bytes", "storage_free_bytes", "temperature_c", "voltage_v", "api_latency_ms", "last_seen_at"],
       "events": ["router.online", "router.offline", "resource.threshold_crossed", "resource.recovered", "router.rebooted"],
       "conditions": ["router_is_online", "router_is_stale", "cpu_above", "memory_below", "storage_below", "temperature_above"],
       "actions": ["reconnect_api"]

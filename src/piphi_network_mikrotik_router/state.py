@@ -1,21 +1,29 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
+import time
 from typing import Any
 
+import httpx
 from fastapi import HTTPException
-
 from piphi_runtime_kit_python import (
     AutomationRegistry,
     SQLiteAutomationIdempotencyStore,
     build_local_event_record,
     build_runtime_identity,
     create_runtime_starter,
+    schedule_telemetry_delivery,
 )
 
 from .contract import CAPABILITIES, COMMANDS
+from .routeros import fetch_resources
 from .schemas import DeviceConfig
 from .settings import INTEGRATION_ID, INTEGRATION_NAME, INTEGRATION_VERSION
+
+logger = logging.getLogger(__name__)
+router_passwords: dict[str, str] = {}
 
 starter = create_runtime_starter(
     integration_id=INTEGRATION_ID,
@@ -42,7 +50,7 @@ def make_entry(config: DeviceConfig) -> dict[str, Any]:
         **identity,
         "host": config.host,
         "alias": config.alias,
-        "config": config.model_dump(),
+        "config": config.model_dump(exclude={"api_key"}),
     }
 
 
@@ -71,17 +79,23 @@ def get_entry_or_404(config_id: str) -> dict[str, Any]:
 
 async def apply_config(config: DeviceConfig) -> None:
     entry = make_entry(config)
-    registry.set(config.id, entry)
+    if config.api_key:
+        router_passwords[entry["config_id"]] = config.api_key
+    else:
+        router_passwords.pop(entry["config_id"], None)
+    registry.set(entry["config_id"], entry)
     registry.update_state(
-        config.id,
+        entry["config_id"],
         {
-            "connected": True,
+            "connected": False,
             "host": config.host,
             "alias": config.alias,
             "config_id": entry["config_id"],
         },
         device_id=entry["device_id"],
     )
+    if config.username and config.api_key:
+        await refresh_entry(entry)
     append_runtime_event(
         "runtime.config.applied",
         entry,
@@ -89,8 +103,72 @@ async def apply_config(config: DeviceConfig) -> None:
     )
 
 
+async def refresh_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    config = DeviceConfig.model_validate(entry["config"])
+    password = router_passwords.get(str(entry["config_id"]))
+    if not config.username or not password:
+        state = {"connected": False, "reason": "missing_router_credentials"}
+        registry.update_state(entry["config_id"], state, device_id=entry["device_id"])
+        return state
+    try:
+        resources = await fetch_resources(
+            config.host,
+            config.username,
+            password,
+            ca_bundle_path=config.ca_bundle_path,
+        )
+    except (httpx.HTTPError, OSError, TypeError, ValueError) as exc:
+        logger.warning(
+            "router_resource_refresh_failed config_id=%s error=%s",
+            entry["config_id"],
+            type(exc).__name__,
+        )
+        state = {"connected": False, "reason": "router_resource_fetch_failed"}
+        registry.update_state(entry["config_id"], state, device_id=entry["device_id"])
+        return state
+    metrics = {
+        "connected": True,
+        "cpu_load_percent": resources.cpu_load_percent,
+        "memory_used_percent": resources.memory_used_percent,
+    }
+    registry.update_state(entry["config_id"], metrics, device_id=entry["device_id"])
+    entry["latest_metrics"] = metrics
+    entry["next_poll_at"] = time.monotonic() + max(
+        60, config.poll_interval_seconds or 300
+    )
+    task = schedule_telemetry_delivery(
+        process_state=runtime.process_state,
+        telemetry_client=telemetry,
+        auth_context=runtime.auth,
+        config_id=str(entry["config_id"]),
+        device_id=str(entry["device_id"]),
+        container_id=entry.get("container_id"),
+        metrics=metrics,
+        units={"cpu_load_percent": "%", "memory_used_percent": "%"},
+    )
+    if task is not None:
+        task.add_done_callback(
+            lambda completed: (
+                completed.exception() if not completed.cancelled() else None
+            )
+        )
+    return metrics
+
+
+async def poll_routers() -> None:
+    while True:
+        await asyncio.sleep(5)
+        now = time.monotonic()
+        for entry in list(registry.entries.values()):
+            if entry.get("next_poll_at", 0) > now:
+                continue
+            entry["next_poll_at"] = now + 300
+            await refresh_entry(entry)
+
+
 async def remove_config(config_id: str) -> bool:
     entry = registry.remove(config_id)
+    router_passwords.pop(config_id, None)
     if entry is None:
         return False
     append_runtime_event(
@@ -103,15 +181,20 @@ async def remove_config(config_id: str) -> bool:
 
 def _register_automation_actions() -> None:
     for command_name, command_definition in commands.items():
-        def handler(request, *, _command_name=command_name):
+
+        async def handler(request, *, _command_name=command_name):
             target = getattr(request, "target", None)
             target = target if isinstance(target, dict) else {}
-            device_id = str(request.device_id or target.get("device_id") or "demo-device")
+            device_id = str(
+                request.device_id or target.get("device_id") or "demo-device"
+            )
             config_id = str(request.config_id or target.get("config_id") or device_id)
-            entry = registry.get(config_id) or {
-                "device_id": device_id,
-                "config_id": config_id,
-            }
+            entry = registry.get(config_id)
+            if entry is None:
+                raise ValueError("Unknown configured router")
+            metrics = await refresh_entry(entry)
+            if not metrics.get("connected"):
+                raise RuntimeError("Router resources are unavailable")
             event = append_runtime_event(
                 "runtime.command.received",
                 entry,
@@ -130,6 +213,7 @@ def _register_automation_actions() -> None:
                 "config_id": config_id,
                 "target": target,
                 "params": request.args,
+                "cpu_load_percent": metrics["cpu_load_percent"],
             }
 
         automations.action(
@@ -139,3 +223,11 @@ def _register_automation_actions() -> None:
 
 
 _register_automation_actions()
+async def _refresh_all_state() -> None:
+    for entry_id in registry.ids():
+        entry = registry.get(entry_id)
+        if entry is not None:
+            await refresh_entry(entry)
+
+
+starter.state.provide(_refresh_all_state, source=INTEGRATION_ID)
